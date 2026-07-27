@@ -1,12 +1,13 @@
 # 3-D Gaussian Splat Renderer in Python
 
-A highly parallelized Triton-based implementation of a 3-D Gaussian Splatting renderer
+A highly parallelized implementation of a 3-D Gaussian Splatting renderer with Python, PyTorch, and a Triton kernel.
 
 The renderer implementation largely follows the description from Algorithm 2 of the original 3DGS [paper](https://arxiv.org/abs/2308.04079) (Kerbl et al. 2023). Additional details were based on Appendix C of the technical [report](https://arxiv.org/abs/2409.06765) for the `gsplat` [library](https://github.com/nerfstudio-project/gsplat) report. No other sources or code were consulted while preparing this implementation.
 
 ![Algorithm 2 from Kerbl et al. 2023](figs/3dgs-renderer-algorithm2.png)
 *Algorithm 2 from Kerbl et al. 2023, describing the rasterization-based approach to render Gaussians.*
 
+### Implementation details
 
 The actual implementation requires interleaving culls with calculation steps for efficiency, which significantly impacts the structure of the final implementation, such that the actual order and complexity of the steps taken differ from Algorithm 2. Specifically, my approach takes the following steps.
 
@@ -53,7 +54,7 @@ To keep calculations efficient, I maintain a `mask` variable which I update with
 
 While loading the data, we account for the fact that 3DGS stores the always-positive-definite Gaussian covariance $\Sigma$ by exploiting the symmetric matrix decomposition $\Sigma = R S S^T R^T$, where $S$ is a diagonal scaling matrix and $R$ is a rotation matrix; $S$ is stored as a $3$-D vector and $R$ is stored as a unit quaternion. 
 
-### Comparison to original renderer
+### Results compared to the original renderer
 
 I render the *garden* scene from the original 3DGS paper and calculate PSNR against the ground-truth camera view for my implementation and for Kerbl et al.'s implementation.
     
