@@ -23,11 +23,19 @@ The actual implementation requires interleaving culls with calculation steps for
 1. **Viewing plane Gaussian culling**: Gaussians whose $z$-coordinates are too close to the camera (0.01) are removed
 1. **2-D projection**: Take $\mu_x, \mu_y$ as the $x$ and $y$ components of the 3-D camera-space mean $\mu_c$. Calculate the corresponding rasterized 2-D pixel coordinates as $\mu' = (p_i, p_j)$ where $p_i = f_x (\mu_x / \mu_z) + c_x - 0.5$ and $p_j = f_y (\mu_y / \mu_z) + c_y - 0.5$. 
 1. **2-D view frustum cull**: Remove Gaussians which are not inside the pixel grid, i.e., restricted to $x \in [x_\text{min}, x_\text{max}]$ and $y \in [y_\text{min}, y_\text{max}]$, where we calculate, using camera intrinsics and the dimensions of the rasterized image, $x_\text{min} = \frac{-c_x}{f_x}$, $x_\text{max} = \frac{w - c_x}{f_x}$, $y_\text{min} = \frac{-c_y}{f_y}$, $y_\text{max} = \frac{h - c_y}{f_y}$.
-1. **2-D Gaussian approximation**: For efficient rasterization, 3DGS converts the 3-D Gaussian PDFs into 2-D Gaussian PDFs with a first-order Taylor approximation, such that exact confidence intervals for intersection of a Gaussian with a pixel coordinate can be calculated. The projected 2-D covariance matrix is approximated as $\Sigma' = J R \Sigma R^T J^T$, where $$J = \begin{bmatrix}
+1. **2-D Gaussian approximation**: For efficient rasterization, 3DGS converts the 3-D Gaussian PDFs into 2-D Gaussian PDFs with a first-order Taylor approximation, such that exact confidence intervals for intersection of a Gaussian with a pixel coordinate can be calculated. The projected 2-D covariance matrix is approximated as $\Sigma' = J R \Sigma R^T J^T$, where 
+
+$$
+
+J = \begin{bmatrix}
     \frac{f_x}{\mu_z} & 0 & -\frac{f_x \mu_x}{\mu_z^2}\\
     0 & \frac{f_y}{\mu_z} & -\frac{f_y \mu_y}{\mu_z^2}
-\end{bmatrix}.$$
+\end{bmatrix}.
+
+$$
+
 Note that the $R \Sigma R^T$ term is the projection of the covariance matrix to 3-D camera space and $J$ is the Jacobian of the projection from camera space to  pixel space. Importantly, after calculating this, we add $0.3$ to the diagonal, which was done by the original 3DGS codebase but is not mentioned in the paper, as pointed out in the `gsplat` technical report.
+
 1. **Confidence interval cull**: Gaussians with less than a 99\% confidence interval of intersecting the 2-D viewing plane are culled. In practice, I efficiently approximate this by checking if the view frustum lies within a radius $r$ of $\mu'$, where $r$ is the maximum of the standard deviations of the Gaussian in the $x$ and $y$ directions.
 1. **View-dependent color calculation**: Calculate the viewing direction from the world space 3-D camera coordinate to the camera, i.e., $\hat{d} = \mu - t$ and normalize it to a unit vector. We then calculate the view-dependent color in a channel as $$\sum_{l=0}^L \sum_{m=-l}^l \text{c}_{lm}^\text{channel} Y_{lm}(\hat{d}).$$
 where $L$ is the number of spherical harmonic degrees and $2l+1$ is the number of basis functions in that degree. $Y_{lm}$, which evaluates the spherical harmonic basis function at a given direction, is computed using code from the original 3DGS codebase. $c_{lm}^\text{channel}$ is stored for each Gaussian and provided to us by the trained scene.
