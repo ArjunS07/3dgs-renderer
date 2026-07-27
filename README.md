@@ -11,11 +11,15 @@ The renderer implementation largely follows the description from Algorithm 2 of 
 
 The actual implementation requires interleaving culls with calculation steps for efficiency, which significantly impacts the structure of the final implementation, such that the actual order and complexity of the steps taken differ from Algorithm 2. Specifically, my approach takes the following steps.
 
-**Inputs**: For each Gaussian, we require its 3-D mean $\mathbf{\mu}$ in world space, its 3-D covariance $\Sigma_\text{3D}$, the spherical harmonic coefficients used to represent its view-dependent colors, and its opacity $\alpha$. We are provided the camera intrinsics, i.e., the focal lengths (in pixel units) $f_x$ and $f_y$ and the principal point $(c_x, c_y)$ of the camera; we are also provided the camera extrinsics for each of the required views, i.e., a $(4 \times 4)$ matrix of the form $\begin{bmatrix}
+**Inputs**: For each Gaussian, we require its 3-D mean $\mathbf{\mu}$ in world space, its 3-D covariance $\Sigma_\text{3D}$, the spherical harmonic coefficients used to represent its view-dependent colors, and its opacity $\alpha$. We are provided the camera intrinsics, i.e., the focal lengths (in pixel units) $f_x$ and $f_y$ and the principal point $(c_x, c_y)$ of the camera; we are also provided the camera extrinsics for each of the required views, i.e., a $(4 \times 4)$ matrix of the form 
+$$
+\begin{bmatrix}
 \mathbf{R} & \boldsymbol{t} \\
 \hline
 \mathbf{0} & 1
-\end{bmatrix}$ describing the world-to-camera rotation and translation in homogeneous coordinates. Our goal is to rasterize the image to a 2-D pixel grid of dimensions $(w, h)$. 
+\end{bmatrix}
+$$ 
+describing the world-to-camera rotation and translation in homogeneous coordinates. Our goal is to rasterize the image to a 2-D pixel grid of dimensions $(w, h)$. 
 
 **Rasterization loop**: For every camera view (i.e., every camera extrinsic pair $\mathbf{R}, \mathbf{t}$)
 
@@ -36,9 +40,11 @@ Note that the $R \Sigma R^T$ term is the projection of the covariance matrix to 
 
 1. **Confidence interval cull**: Gaussians with less than a 99\% confidence interval of intersecting the 2-D viewing plane are culled. In practice, I efficiently approximate this by checking if the view frustum lies within a radius $r$ of $\mu'$, where $r$ is the maximum of the standard deviations of the Gaussian in the $x$ and $y$ directions.
 1. **View-dependent color calculation**: Calculate the viewing direction from the world space 3-D camera coordinate to the camera, i.e., $\hat{d} = \mu - t$ and normalize it to a unit vector. We then calculate the view-dependent color in a channel as 
+
 $$
 \sum_{l=0}^L \sum_{m=-l}^l \text{c}_{lm}^\text{channel} Y_{lm}(\hat{d})
 $$
+
 where $L$ is the number of spherical harmonic degrees and $2l+1$ is the number of basis functions in that degree. $Y_{lm}$, which evaluates the spherical harmonic basis function at a given direction, is computed using code from the original 3DGS codebase. $c_{lm}^\text{channel}$ is stored for each Gaussian and provided to us by the trained scene.
 1. **2-D inverse covariance**: We analytically calculate the inverse 2-D covariance of each Gaussian using the standard form for the inverse of a $2 \times 2$ matrix. 
 1. **Parallelized rasterization**: We now calculate the colors of each pixel using alpha-blending. This is done in a highly parallelized way on a GPU, which I implement using the Triton library for Python.
