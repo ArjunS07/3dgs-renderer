@@ -12,6 +12,7 @@ The renderer implementation largely follows the description from Algorithm 2 of 
 The actual implementation requires interleaving culls with calculation steps for efficiency, which significantly impacts the structure of the final implementation, such that the actual order and complexity of the steps taken differ from Algorithm 2. Specifically, my approach takes the following steps.
 
 **Inputs**: For each Gaussian, we require its 3-D mean $\mathbf{\mu}$ in world space, its 3-D covariance $\Sigma_\text{3D}$, the spherical harmonic coefficients used to represent its view-dependent colors, and its opacity $\alpha$. We are provided the camera intrinsics, i.e., the focal lengths (in pixel units) $f_x$ and $f_y$ and the principal point $(c_x, c_y)$ of the camera; we are also provided the camera extrinsics for each of the required views, i.e., a $(4 \times 4)$ matrix of the form 
+
 $$
 \begin{bmatrix}
 \mathbf{R} & \boldsymbol{t} \\
@@ -19,6 +20,7 @@ $$
 \mathbf{0} & 1
 \end{bmatrix}
 $$ 
+
 describing the world-to-camera rotation and translation in homogeneous coordinates. Our goal is to rasterize the image to a 2-D pixel grid of dimensions $(w, h)$. 
 
 **Rasterization loop**: For every camera view (i.e., every camera extrinsic pair $\mathbf{R}, \mathbf{t}$)
