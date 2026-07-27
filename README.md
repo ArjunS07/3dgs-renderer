@@ -26,18 +26,19 @@ The actual implementation requires interleaving culls with calculation steps for
 1. **2-D Gaussian approximation**: For efficient rasterization, 3DGS converts the 3-D Gaussian PDFs into 2-D Gaussian PDFs with a first-order Taylor approximation, such that exact confidence intervals for intersection of a Gaussian with a pixel coordinate can be calculated. The projected 2-D covariance matrix is approximated as $\Sigma' = J R \Sigma R^T J^T$, where 
 
 $$
-
 J = \begin{bmatrix}
     \frac{f_x}{\mu_z} & 0 & -\frac{f_x \mu_x}{\mu_z^2}\\
     0 & \frac{f_y}{\mu_z} & -\frac{f_y \mu_y}{\mu_z^2}
 \end{bmatrix}.
-
 $$
 
 Note that the $R \Sigma R^T$ term is the projection of the covariance matrix to 3-D camera space and $J$ is the Jacobian of the projection from camera space to  pixel space. Importantly, after calculating this, we add $0.3$ to the diagonal, which was done by the original 3DGS codebase but is not mentioned in the paper, as pointed out in the `gsplat` technical report.
 
 1. **Confidence interval cull**: Gaussians with less than a 99\% confidence interval of intersecting the 2-D viewing plane are culled. In practice, I efficiently approximate this by checking if the view frustum lies within a radius $r$ of $\mu'$, where $r$ is the maximum of the standard deviations of the Gaussian in the $x$ and $y$ directions.
-1. **View-dependent color calculation**: Calculate the viewing direction from the world space 3-D camera coordinate to the camera, i.e., $\hat{d} = \mu - t$ and normalize it to a unit vector. We then calculate the view-dependent color in a channel as $$\sum_{l=0}^L \sum_{m=-l}^l \text{c}_{lm}^\text{channel} Y_{lm}(\hat{d}).$$
+1. **View-dependent color calculation**: Calculate the viewing direction from the world space 3-D camera coordinate to the camera, i.e., $\hat{d} = \mu - t$ and normalize it to a unit vector. We then calculate the view-dependent color in a channel as 
+$$
+\sum_{l=0}^L \sum_{m=-l}^l \text{c}_{lm}^\text{channel} Y_{lm}(\hat{d})
+$$
 where $L$ is the number of spherical harmonic degrees and $2l+1$ is the number of basis functions in that degree. $Y_{lm}$, which evaluates the spherical harmonic basis function at a given direction, is computed using code from the original 3DGS codebase. $c_{lm}^\text{channel}$ is stored for each Gaussian and provided to us by the trained scene.
 1. **2-D inverse covariance**: We analytically calculate the inverse 2-D covariance of each Gaussian using the standard form for the inverse of a $2 \times 2$ matrix. 
 1. **Parallelized rasterization**: We now calculate the colors of each pixel using alpha-blending. This is done in a highly parallelized way on a GPU, which I implement using the Triton library for Python.
@@ -46,10 +47,10 @@ where $L$ is the number of spherical harmonic degrees and $2l+1$ is the number o
         1. Expand the list of $N$ Gaussians into a list of length $M = \sum\limits_{i=1}^{N} t_i$, where $t_i$ is the number of tiles whose extent intersects the 3-stddev radius of the $i$-th 2-D Gaussian; such that each Gaussian appears once in this list for every tile it overlaps.
         1. We prepare sort keys, following the implementation of Kerbl et al. 2023. The 32 high bits represent the tile ID, and the low bits represent the depth of the Gaussians in 3-D space. 
         1. Sort the Gaussians in the $M$-length list by these keys.
-        1. Prepare the `index list', i.e., a list where the $t$-th value represents the offset into the $M$-length list where the $t$-th tile's Gaussians begin.
+        1. Prepare the 'index list', i.e., a list where the $t$-th value represents the offset into the $M$-length list where the $t$-th tile's Gaussians begin.
         1. Launch the kernel, passing in Gaussian properties (expanded up to $M$-length lists) and the index list calculated in the previous step. The kernel spawns one thread for every pixel. In each thread, we 
             1. Calculate the 2-D pixel coordinate the thread is responsible for
-            1. Start tracking transmittance $T \leftarrow 1$ and RGB color $**c** \leftarrow \mathbf{0}$ for that pixel, which will be composited in the following steps. 
+            1. Start tracking transmittance $T \leftarrow 1$ and RGB color $c \leftarrow \mathbf{0}$ for that pixel, which will be composited in the following steps. 
             1. Calculate the number of Gaussians overlapping with that pixel's tile. This can be calculated as the difference between the entry in the index list for the next tile and the entry for the current tile. 
             1. For each $i$-th overlapping Gaussian, 
                 1. Calculate the exact probability density of the 2-D gaussian at that pixel coordinate $\mathbf{x}$ as $$G(\mathbf{x}) = \exp(-0.5 \cdot (\mathbf{x} - \mu')^T \Sigma{'^{-1}}_i (\mathbf{x} - \mu')).$$
